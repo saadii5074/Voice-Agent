@@ -18,4 +18,4 @@ RUN cd frontend && npm install && npm run build
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # 3. Start the FastAPI server (which also serves the frontend static files)
-CMD cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+CMD ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
