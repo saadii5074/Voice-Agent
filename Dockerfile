@@ -21,5 +21,6 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 ENV PORT=8000
 
 WORKDIR /app/backend
-# Use Python to start uvicorn - avoids $PORT shell expansion issues
-CMD ["python", "-c", "import os, uvicorn; uvicorn.run('main:app', host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))"]
+RUN chmod +x run.sh
+
+ENTRYPOINT ["/bin/sh", "/app/backend/run.sh"]
