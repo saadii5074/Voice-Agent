@@ -17,9 +17,9 @@ RUN cd frontend && npm install && npm run build
 # 2. Install Python Backend Dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Default port (Railway will override with its own PORT env var at runtime)
+# Default port (Railway overrides this with its own PORT env var)
 ENV PORT=8000
 
-# 3. Start using a shell script so $PORT expands correctly
 WORKDIR /app/backend
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Use Python to start uvicorn - avoids $PORT shell expansion issues
+CMD ["python", "-c", "import os, uvicorn; uvicorn.run('main:app', host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))"]
