@@ -17,5 +17,9 @@ RUN cd frontend && npm install && npm run build
 # 2. Install Python Backend Dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# 3. Start the FastAPI server (which also serves the frontend static files)
-CMD ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Default port (Railway will override with its own PORT env var at runtime)
+ENV PORT=8000
+
+# 3. Start using a shell script so $PORT expands correctly
+WORKDIR /app/backend
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
