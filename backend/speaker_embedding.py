@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
 # Multi-metric similarity threshold for same-speaker verification:
-# - Same voice: 0.88 - 0.99
-# - Different voice / speaker: < 0.85
-BIOMETRIC_SIMILARITY_THRESHOLD = 0.82
+BIOMETRIC_SIMILARITY_THRESHOLD = 0.78
 
 
 def pcm16_to_float32(pcm_bytes: bytes) -> np.ndarray:
@@ -64,8 +62,8 @@ class VoiceFingerprint:
 
     def similarity_to(self, other: VoiceFingerprint) -> float:
         """
-        Multi-metric biometric similarity combining 192-dim ECAPA-TDNN neural d-vectors
-        and acoustic timbre/pitch contours.
+        Multi-metric acoustic biometric similarity combining 24-dim MFCC filterbank
+        and fundamental pitch (F0) & formant/centroid contours.
         """
         sim_mfcc = float(np.dot(self.mfcc_vector, other.mfcc_vector))
         sim_mfcc = max(0.0, min(1.0, sim_mfcc))
@@ -78,22 +76,11 @@ class VoiceFingerprint:
         c_max = max(self.centroid, other.centroid)
         sim_centroid = (c_min / c_max) if c_max > 0 else 1.0
 
-        # Compute 192-dim ECAPA-TDNN Neural Cosine Similarity if present
-        if self.neural_embedding is not None and other.neural_embedding is not None:
-            sim_neural = float(np.dot(self.neural_embedding, other.neural_embedding))
-            sim_neural = max(0.0, min(1.0, sim_neural))
-        else:
-            sim_neural = sim_mfcc
+        # Pitch penalty if fundamentally different vocal registers (< 0.72)
+        pitch_penalty = 0.85 if sim_pitch < 0.72 else 1.0
 
-        # If pitch is significantly different (< 0.70 like male vs female or adult vs child),
-        # apply an acoustic penalty to prevent cross-speaker confusion
-        pitch_penalty = 0.85 if sim_pitch < 0.70 else 1.0
-
-        if sim_mfcc < 0.82:
-            return float(sim_mfcc * 0.95 * pitch_penalty)
-
-        # Weighted combination: 50% 192-dim ECAPA-TDNN Neural, 30% MFCC, 15% Pitch, 5% Centroid
-        combined = 0.50 * sim_neural + 0.30 * sim_mfcc + 0.15 * sim_pitch + 0.05 * sim_centroid
+        # Weighted combination: 60% MFCC, 25% Pitch, 15% Centroid
+        combined = 0.60 * sim_mfcc + 0.25 * sim_pitch + 0.15 * sim_centroid
         return float(combined * pitch_penalty)
 
 
@@ -150,11 +137,11 @@ class SpeakerEmbeddingExtractor:
 
     def extract_fingerprint(self, audio: np.ndarray) -> Optional[VoiceFingerprint]:
         """Extract VoiceFingerprint from audio. Returns None if audio is silent, noise, or too short."""
-        if len(audio) < 3200:  # Require at least 200ms of audio
+        if len(audio) < 2400:  # Require at least 150ms of audio
             return None
 
         rms = np.sqrt(np.mean(audio ** 2))
-        if rms < 0.012:  # Background noise / mic static filter
+        if rms < 0.004:  # Background noise / mic static filter (allows natural & quiet speech)
             return None
 
         pre_emp = np.append(audio[0], audio[1:] - 0.97 * audio[:-1])
@@ -294,9 +281,11 @@ class AcousticSpeakerTracker:
             self._last_active_speaker = best_label
             return best_label
 
-        label = self._register_new_speaker(fp)
-        self._last_active_speaker = label
-        return label
+        if len(audio_chunk) >= 4800 or not self._speakers:
+            label = self._register_new_speaker(fp)
+            self._last_active_speaker = label
+            return label
+        return best_label if best_label else self._speakers[0]
 
     def _compute_best_match(self, fp: VoiceFingerprint):
         """Returns (best_label, best_similarity) across all registered speakers using stable voice centroids."""

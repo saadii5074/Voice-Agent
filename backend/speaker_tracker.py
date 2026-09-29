@@ -43,52 +43,43 @@ class SpeakerTracker:
         deepgram_speaker_id: Optional[int] = None,
     ) -> str:
         """
-        Multi-layer speaker identification & tracking:
-        Layer 1: If Deepgram speaker cluster ID (0, 1, 2) is already bound, stick with it.
-                 Eliminates cross-speaker confusion and flipping.
-        Layer 2: If Deepgram speaker cluster ID is new, register up to max_speakers (3)
-                 and bind permanently.
-        Layer 3: If no Deepgram speaker ID is provided, fallback to 192-dim ECAPA-TDNN
-                 biometric voice matching.
+        Unified Multi-Speaker Tracking (Up to max_speakers, default 3):
+        - If Deepgram explicitly identified a new cluster (e.g. cluster 2 for Speaker 3),
+          registers it immediately.
+        - Performs acoustic biometric voice verification on audio_chunk:
+          - If the voice matches a known speaker (Speaker 1, 2, or 3), attributes to that speaker.
+          - If the voice is a NEW speaker (< similarity_threshold) and fewer than max_speakers
+            are registered, REGISTERS THE NEW SPEAKER (Speaker 3)!
+          - If all max_speakers (3) are registered, dynamically attributes to the best biometric match.
+        - If audio_chunk is silent or too short (< 150ms), maintains active speaker continuity.
         """
-        # ── Layer 1: Locked Deepgram Cluster ──────────────────────────────────
-        if deepgram_speaker_id is not None and deepgram_speaker_id in self._deepgram_to_label:
-            label = self._deepgram_to_label[deepgram_speaker_id]
-            if is_final and len(audio_chunk) >= 9600:  # >= 300ms
-                self._acoustic_tracker.update_known_speaker(label, audio_chunk)
+        all_spks = self._acoustic_tracker.get_all_speakers()
+
+        # If Deepgram explicitly detected a new speaker cluster ID (e.g. cluster 2)
+        if (
+            deepgram_speaker_id is not None
+            and deepgram_speaker_id >= len(all_spks)
+            and len(all_spks) < settings.max_speakers
+        ):
+            label = self._acoustic_tracker.register_speaker_for_deepgram_id(
+                audio_chunk, deepgram_speaker_id
+            )
+            self._deepgram_to_label[deepgram_speaker_id] = label
             self.session.get_or_create_speaker_profile(label, deepgram_speaker_id)
             return label
 
-        # ── Layer 2: New Deepgram Cluster ID ──────────────────────────────────
-        if deepgram_speaker_id is not None and deepgram_speaker_id >= 0:
-            all_spks = self._acoustic_tracker.get_all_speakers()
-            if len(all_spks) < settings.max_speakers:
-                # Still have room to register a new speaker (e.g. Speaker 2 or Speaker 3)
-                label = self._acoustic_tracker.register_speaker_for_deepgram_id(
-                    audio_chunk, deepgram_speaker_id
-                )
-                self._deepgram_to_label[deepgram_speaker_id] = label
-                self.session.get_or_create_speaker_profile(label, deepgram_speaker_id)
-                return label
-            else:
-                # All max_speakers (3) are registered:
-                # Attribute this cluster to the best biometric match among the 3
-                label = self._acoustic_tracker.identify_speaker_from_audio(
-                    audio_chunk=audio_chunk,
-                    is_final=is_final,
-                    deepgram_speaker_hint=deepgram_speaker_id,
-                )
-                self._deepgram_to_label[deepgram_speaker_id] = label
-                self.session.get_or_create_speaker_profile(label, deepgram_speaker_id)
-                return label
-
-        # ── Layer 3: Acoustic Biometric Fallback ──────────────────────────────
+        # Run acoustic biometric identification
         label = self._acoustic_tracker.identify_speaker_from_audio(
             audio_chunk=audio_chunk,
             is_final=is_final,
-            deepgram_speaker_hint=None,
+            deepgram_speaker_hint=deepgram_speaker_id,
         )
-        self.session.get_or_create_speaker_profile(label, 0)
+
+        # Update deepgram mapping if new cluster
+        if deepgram_speaker_id is not None and deepgram_speaker_id not in self._deepgram_to_label:
+            self._deepgram_to_label[deepgram_speaker_id] = label
+
+        self.session.get_or_create_speaker_profile(label, deepgram_speaker_id or 0)
         return label
 
     def get_or_create_speaker(self, deepgram_speaker_id: int) -> str:
