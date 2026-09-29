@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React from 'react';
-import { Play, Square, Download, Loader2, Radio } from 'lucide-react';
+import { Play, Square, Download, Loader2, Radio, Languages, Check } from 'lucide-react';
 import type { SessionStatus } from '../types';
 
 interface Props {
@@ -11,6 +11,9 @@ interface Props {
   onStart: () => void;
   onStop: () => void;
   onDownload: () => void;
+  onTranslate?: () => void;
+  isTranslating?: boolean;
+  isTranslated?: boolean;
   transcriptCount: number;
 }
 
@@ -28,6 +31,9 @@ export const SessionControls: React.FC<Props> = ({
   onStart,
   onStop,
   onDownload,
+  onTranslate,
+  isTranslating,
+  isTranslated,
   transcriptCount,
 }) => {
   const isLive      = status === 'live';
@@ -128,6 +134,40 @@ export const SessionControls: React.FC<Props> = ({
             </button>
           )}
         </div>
+      )}
+
+      {/* Translate All to English button when session has transcripts */}
+      {transcriptCount > 0 && onTranslate && (
+        <button
+          style={{
+            ...styles.translateBtn,
+            background: isTranslated
+              ? 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.2))'
+              : 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
+            borderColor: isTranslated ? 'var(--success)' : 'var(--primary)',
+            color: isTranslated ? 'var(--success)' : 'var(--text-primary)',
+          }}
+          onClick={onTranslate}
+          disabled={isTranslating}
+          title="Translate all conversation to English"
+        >
+          {isTranslating ? (
+            <>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              Translating all chat...
+            </>
+          ) : isTranslated ? (
+            <>
+              <Check size={16} />
+              Translated to English
+            </>
+          ) : (
+            <>
+              <Languages size={16} />
+              Translate All to English
+            </>
+          )}
+        </button>
       )}
 
       {/* Download button when stopped */}
@@ -259,6 +299,21 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 'var(--radius-md)',
     fontSize: '12px',
     fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all var(--transition)',
+    fontFamily: 'var(--font)',
+    width: '100%',
+  },
+  translateBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--primary)',
+    fontSize: '12px',
+    fontWeight: 600,
     cursor: 'pointer',
     transition: 'all var(--transition)',
     fontFamily: 'var(--font)',

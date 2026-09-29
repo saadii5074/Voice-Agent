@@ -20,7 +20,15 @@ import { AudioVisualizer } from './components/AudioVisualizer';
 import { SPEAKER_COLORS }  from './utils/constants';
 
 function App() {
-  const { state, startSession, stopSession, downloadTranscript } = useSession();
+  const {
+    state,
+    startSession,
+    stopSession,
+    downloadTranscript,
+    translateAll,
+    isTranslating,
+    isTranslated,
+  } = useSession();
   const { isCapturing, audioLevel }  = useAudioCapture();
   const { wsStatus }                 = useWebSocket();
 
@@ -129,6 +137,9 @@ function App() {
             onStart={startSession}
             onStop={stopSession}
             onDownload={downloadTranscript}
+            onTranslate={translateAll}
+            isTranslating={isTranslating}
+            isTranslated={isTranslated}
             transcriptCount={state.transcript.length}
           />
         </aside>

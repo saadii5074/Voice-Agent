@@ -122,6 +122,12 @@ export const TranscriptView: React.FC<Props> = ({ segments, currentSpeakerId }) 
                   }}
                 >
                   {seg.text}
+                  {seg.originalText && seg.originalText !== seg.text && (
+                    <div style={styles.originalSubtext}>
+                      <span style={styles.originalBadge}>Original</span>
+                      {seg.originalText}
+                    </div>
+                  )}
                   {!seg.isFinal && (
                     <span style={styles.interimDot}>
                       <span style={styles.dot} />
@@ -234,6 +240,28 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.55,
     wordBreak: 'break-word',
     position: 'relative',
+  },
+  originalSubtext: {
+    marginTop: '6px',
+    paddingTop: '6px',
+    borderTop: '1px solid var(--border)',
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    fontStyle: 'italic',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  originalBadge: {
+    fontSize: '9px',
+    textTransform: 'uppercase',
+    fontWeight: 700,
+    letterSpacing: '0.05em',
+    padding: '1px 5px',
+    borderRadius: '3px',
+    background: 'var(--card-hover)',
+    color: 'var(--text-secondary)',
+    fontStyle: 'normal',
   },
   interimDot: {
     display: 'inline-flex',

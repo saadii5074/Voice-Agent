@@ -2,7 +2,7 @@
 //  useSession.ts — Main session state management with useReducer
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useReducer, useRef, useCallback, useEffect } from 'react';
+import { useState, useReducer, useRef, useCallback, useEffect } from 'react';
 import { api } from '../services/api';
 import { voiceAgentWS } from '../services/websocket';
 import { audioCapture } from '../services/audioCapture';
@@ -37,6 +37,7 @@ type Action =
   | { type: 'TRANSCRIPT_UPDATE'; segmentId: string; text: string; isFinal: boolean }
   | { type: 'SPEAKER_LIST'; speakers: Speaker[] }
   | { type: 'SET_LANGUAGE'; language: string }
+  | { type: 'TRANSCRIPT_TRANSLATED'; segments: any[] }
   | { type: 'RESET' };
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
@@ -106,6 +107,22 @@ function reducer(state: SessionState, action: Action): SessionState {
 
     case 'SET_LANGUAGE':
       return { ...state, language: action.language };
+
+    case 'TRANSCRIPT_TRANSLATED': {
+      const updated = state.transcript.map((seg, idx) => {
+        const trans = action.segments[idx];
+        if (trans && trans.translated_text) {
+          return {
+            ...seg,
+            originalText: seg.originalText || seg.text,
+            text: trans.translated_text,
+            translatedText: trans.translated_text,
+          };
+        }
+        return seg;
+      });
+      return { ...state, transcript: updated };
+    }
 
     case 'RESET':
       return initialState;
@@ -351,10 +368,36 @@ export function useSession() {
     URL.revokeObjectURL(url);
   }, []);
 
+  // ── translateAll (All Chat at Once into English) ───────────────────────────
+
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslated, setIsTranslated] = useState(false);
+
+  const translateAll = useCallback(async () => {
+    const sid = stateRef.current.sessionId;
+    if (!sid || stateRef.current.transcript.length === 0) return;
+
+    setIsTranslating(true);
+    try {
+      const res = await api.translateSession(sid);
+      if (res && res.translated_segments && res.translated_segments.length > 0) {
+        dispatch({ type: 'TRANSCRIPT_TRANSLATED', segments: res.translated_segments });
+        setIsTranslated(true);
+      }
+    } catch (err) {
+      console.error('[useSession] translateAll error', err);
+    } finally {
+      setIsTranslating(false);
+    }
+  }, []);
+
   return {
     state,
     startSession,
     stopSession,
     downloadTranscript,
+    translateAll,
+    isTranslating,
+    isTranslated,
   };
 }

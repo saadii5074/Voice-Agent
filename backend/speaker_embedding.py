@@ -417,8 +417,22 @@ class AcousticSpeakerTracker:
         if label not in self._samples:
             self._samples[label] = []
         self._samples[label].append(new_fp)
-        if len(self._samples[label]) > 8:
-            self._samples[label].pop(0)
+    def register_speaker_for_deepgram_id(self, audio_chunk: bytes, deepgram_speaker_id: int) -> str:
+        """Register a new speaker explicitly bound to a Deepgram cluster ID."""
+        audio_f32 = pcm16_to_float32(audio_chunk)
+        fp = self.extractor.extract_fingerprint(audio_f32) if len(audio_chunk) >= 6400 else None
+        label = self._register_new_speaker(fp)
+        self._last_active_speaker = label
+        return label
+
+    def update_known_speaker(self, label: str, audio_chunk: bytes) -> None:
+        """Update biometric centroid of a known speaker using high-quality speech slice."""
+        if len(audio_chunk) < 6400:
+            return
+        audio_f32 = pcm16_to_float32(audio_chunk)
+        fp = self.extractor.extract_fingerprint(audio_f32)
+        if fp is not None:
+            self._update_speaker(label, fp)
 
     def get_all_speakers(self) -> List[str]:
         return list(self._speakers)

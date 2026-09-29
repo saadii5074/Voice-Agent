@@ -164,3 +164,37 @@ async def get_speakers(session_id: str) -> Dict[str, Any]:
         "speaker_count": len(session.speakers),
         "speakers": {k: v.to_dict() for k, v in session.speakers.items()},
     }
+
+
+# ── POST /session/{session_id}/translate ──────────────────────────────────────
+
+
+@router.post("/{session_id}/translate")
+async def translate_session(session_id: str) -> Dict[str, Any]:
+    """
+    Translate all transcripts in the session to English in one go.
+    """
+    from translator import translate_transcript_segments
+
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session '{session_id}' not found",
+        )
+
+    raw_segments = [seg.to_dict() for seg in session.transcript]
+    translated_segments = await translate_transcript_segments(raw_segments, target_language="en")
+
+    # Update in-memory session transcript with translations
+    for idx, trans_seg in enumerate(translated_segments):
+        if idx < len(session.transcript):
+            # Keep original text preserved, add translated English version
+            session.transcript[idx].text = trans_seg["translated_text"]
+
+    return {
+        "session_id": session_id,
+        "segment_count": len(translated_segments),
+        "translated_segments": translated_segments,
+    }
+

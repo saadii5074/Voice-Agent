@@ -22,6 +22,8 @@ export interface TranscriptSegment {
   isFinal: boolean;
   timestamp: string; // ISO timestamp
   color: string;     // speaker hex color
+  originalText?: string;
+  translatedText?: string;
 }
 
 export type SessionStatus =

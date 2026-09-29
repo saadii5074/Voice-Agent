@@ -7,8 +7,12 @@ import type { TranscriptSegment } from '../types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'bypass-tunnel-reminder': 'true',
+      ...(options?.headers || {}),
+    },
   });
 
   if (!res.ok) {
@@ -59,4 +63,10 @@ export const api = {
   /** Fetch metadata / status for a session */
   getSession: (sessionId: string): Promise<SessionDetails> =>
     request<SessionDetails>(`/api/session/${sessionId}`),
+
+  /** Translate all session transcripts to English in one go */
+  translateSession: (sessionId: string): Promise<{ session_id: string; translated_segments: any[] }> =>
+    request<{ session_id: string; translated_segments: any[] }>(`/api/session/${sessionId}/translate`, {
+      method: 'POST',
+    }),
 };
