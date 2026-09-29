@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
 # Multi-metric similarity threshold for same-speaker verification:
-BIOMETRIC_SIMILARITY_THRESHOLD = 0.78
+BIOMETRIC_SIMILARITY_THRESHOLD = 0.72
 
 
 def pcm16_to_float32(pcm_bytes: bytes) -> np.ndarray:

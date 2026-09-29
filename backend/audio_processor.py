@@ -204,16 +204,20 @@ class AudioProcessor:
             # Extract exact audio slice for this speech segment
             audio_slice = self._get_audio_slice(start_t, end_t)
 
-            # ── Acoustic Speaker Tracking ─────────────────────────────────────
-            try:
-                speaker_label = self._speaker_tracker.track_speaker(
-                    audio_chunk=audio_slice,
-                    is_final=is_final,
-                    deepgram_speaker_id=deepgram_hint,
-                )
-            except Exception as e:
-                logger.warning("Session %s: speaker tracking fallback: %s", session_id, e)
+            # ── Layer 1: Interim Lock vs Final Utterance Evaluation ──────────
+            if not is_final:
+                # Never switch or split speaker on interim speech drafts
                 speaker_label = self._current_speaker or "Speaker 1"
+            else:
+                try:
+                    speaker_label = self._speaker_tracker.track_speaker(
+                        audio_chunk=audio_slice,
+                        is_final=True,
+                        deepgram_speaker_id=deepgram_hint,
+                    )
+                except Exception as e:
+                    logger.warning("Session %s: speaker tracking fallback: %s", session_id, e)
+                    speaker_label = self._current_speaker or "Speaker 1"
 
             # Detect speaker change
             if self._current_speaker != speaker_label:
