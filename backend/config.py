@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     deepgram_encoding: str = Field(
         default="linear16", description="Audio encoding format"
     )
+    max_speakers: int = Field(
+        default=3, description="Maximum number of active conversational speakers (e.g. 3 for 3-speaker mode)"
+    )
 
 
 # Module-level singleton — import `settings` everywhere else

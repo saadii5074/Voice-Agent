@@ -27,7 +27,7 @@ SAMPLE_RATE = 16000
 # Multi-metric similarity threshold for same-speaker verification:
 # - Same voice: 0.88 - 0.99
 # - Different voice / speaker: < 0.85
-BIOMETRIC_SIMILARITY_THRESHOLD = 0.75
+BIOMETRIC_SIMILARITY_THRESHOLD = 0.82
 
 
 def pcm16_to_float32(pcm_bytes: bytes) -> np.ndarray:
@@ -85,11 +85,16 @@ class VoiceFingerprint:
         else:
             sim_neural = sim_mfcc
 
+        # If pitch is significantly different (< 0.70 like male vs female or adult vs child),
+        # apply an acoustic penalty to prevent cross-speaker confusion
+        pitch_penalty = 0.85 if sim_pitch < 0.70 else 1.0
+
         if sim_mfcc < 0.82:
-            return float(sim_mfcc * 0.95)
+            return float(sim_mfcc * 0.95 * pitch_penalty)
 
         # Weighted combination: 50% 192-dim ECAPA-TDNN Neural, 30% MFCC, 15% Pitch, 5% Centroid
-        return float(0.50 * sim_neural + 0.30 * sim_mfcc + 0.15 * sim_pitch + 0.05 * sim_centroid)
+        combined = 0.50 * sim_neural + 0.30 * sim_mfcc + 0.15 * sim_pitch + 0.05 * sim_centroid
+        return float(combined * pitch_penalty)
 
 
 class SpeakerEmbeddingExtractor:
@@ -231,9 +236,11 @@ class AcousticSpeakerTracker:
         self,
         session_id: str,
         similarity_threshold: float = BIOMETRIC_SIMILARITY_THRESHOLD,
+        max_speakers: int = 3,
     ) -> None:
         self.session_id = session_id
         self.similarity_threshold = similarity_threshold
+        self.max_speakers = max_speakers
         self.extractor = SpeakerEmbeddingExtractor(sample_rate=SAMPLE_RATE)
 
         self._speakers: List[str] = []
@@ -250,6 +257,7 @@ class AcousticSpeakerTracker:
     ) -> str:
         """
         Identify speaker from audio segment using acoustic voice biometric matching.
+        Supports up to max_speakers (default: 3) with dedicated conversational tracking.
         """
         audio_f32 = pcm16_to_float32(audio_chunk)
         fp = self.extractor.extract_fingerprint(audio_f32)
@@ -266,11 +274,11 @@ class AcousticSpeakerTracker:
             self._last_active_speaker = label
             return label
 
-        if len(self._speakers) >= 2:
-            # ── DEDICATED 2-SPEAKER CONVERSATIONAL MODE ───────────────────────
-            # Once 2 speakers are registered (Speaker 1 and Speaker 2), all future
+        if len(self._speakers) >= self.max_speakers:
+            # ── DEDICATED CONVERSATIONAL MODE (UP TO max_speakers) ───────────
+            # Once all target speakers are registered (Speaker 1, 2, 3), all future
             # conversational speech is dynamically attributed to whichever of the
-            # 2 speakers has higher biometric likelihood. Eliminates phantom speakers.
+            # registered speakers has higher biometric likelihood. Eliminates phantom speakers.
             best_label, _ = self._compute_best_match(fp)
             target = best_label if best_label else self._speakers[0]
             if is_final:

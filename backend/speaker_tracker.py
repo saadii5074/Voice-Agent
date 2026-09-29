@@ -16,6 +16,7 @@ from typing import Dict, List, Optional
 
 from session_manager import SessionState
 from speaker_embedding import AcousticSpeakerTracker, BIOMETRIC_SIMILARITY_THRESHOLD
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class SpeakerTracker:
         self._acoustic_tracker = AcousticSpeakerTracker(
             session_id=self.session_id,
             similarity_threshold=BIOMETRIC_SIMILARITY_THRESHOLD,
+            max_speakers=settings.max_speakers,
         )
         self._deepgram_to_label: Dict[int, str] = {}
 
